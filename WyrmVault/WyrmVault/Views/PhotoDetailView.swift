@@ -1,0 +1,142 @@
+//
+//  PhotoDetailView.swift
+//  WyrmVault
+//
+//  Created by Harold on 26/10/2025.
+//
+
+import SwiftUI
+
+struct PhotoDetailView: View {
+    let originals: [Original]
+    let initialIndex: Int
+
+    @State private var currentIndex: Int
+
+    init(originals: [Original], initialIndex: Int) {
+        self.originals = originals
+        self.initialIndex = initialIndex
+        self._currentIndex = State(initialValue: initialIndex)
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black
+                .ignoresSafeArea()
+
+            TabView(selection: $currentIndex) {
+                ForEach(Array(originals.enumerated()), id: \.element.id) { index, original in
+                    PhotoDetailItem(original: original)
+                        .tag(index)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+        }
+        .navigationTitle("\(currentIndex + 1) of \(originals.count)")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.black, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+    }
+}
+
+// MARK: - Photo Detail Item
+struct PhotoDetailItem: View {
+    let original: Original
+    @State private var imageScale: CGFloat = 1.0
+    @State private var imageOffset: CGSize = .zero
+    @State private var lastScale: CGFloat = 1.0
+
+    var body: some View {
+        ZStack {
+            Color.black
+                .ignoresSafeArea()
+
+            AsyncImage(url: ApiService.shared.originalURL(for: original.id)) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                        .tint(.white)
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .scaleEffect(imageScale)
+                        .offset(imageOffset)
+                        .gesture(
+                            MagnificationGesture()
+                                .onChanged { value in
+                                    imageScale = lastScale * value
+                                }
+                                .onEnded { _ in
+                                    lastScale = imageScale
+                                    // Reset if zoomed out too much
+                                    if imageScale < 1.0 {
+                                        withAnimation {
+                                            imageScale = 1.0
+                                            lastScale = 1.0
+                                            imageOffset = .zero
+                                        }
+                                    }
+                                }
+                        )
+                        .simultaneousGesture(
+                            imageScale > 1.0 ? DragGesture()
+                                .onChanged { value in
+                                    imageOffset = value.translation
+                                }
+                                .onEnded { _ in
+                                    // Keep offset when zoomed
+                                } : nil
+                        )
+                        .onTapGesture(count: 2) {
+                            withAnimation {
+                                if imageScale > 1.0 {
+                                    imageScale = 1.0
+                                    lastScale = 1.0
+                                    imageOffset = .zero
+                                } else {
+                                    imageScale = 2.0
+                                    lastScale = 2.0
+                                }
+                            }
+                        }
+                case .failure:
+                    VStack {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.largeTitle)
+                            .foregroundColor(.red)
+                        Text("Failed to load image")
+                            .foregroundColor(.white)
+                    }
+                @unknown default:
+                    EmptyView()
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    NavigationStack {
+        PhotoDetailView(
+            originals: [
+                Original(
+                    id: "preview-id",
+                    uploadEventId: 1,
+                    originalName: "sample-photo.jpg",
+                    sha256Hash: "abc123",
+                    mimeType: "image/jpeg",
+                    size: 2048000,
+                    fileClassification: "image",
+                    fileMetadata: nil,
+                    dateTaken: "2025-10-26T12:00:00Z",
+                    thumbnails: [],
+                    collections: [],
+                    createdAt: "2025-10-26T12:00:00Z",
+                    updatedAt: "2025-10-26T12:00:00Z"
+                )
+            ],
+            initialIndex: 0
+        )
+    }
+}

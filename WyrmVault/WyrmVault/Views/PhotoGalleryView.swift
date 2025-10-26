@@ -28,14 +28,15 @@ struct PhotoGalleryView: View {
                 .padding(.top, 100)
             } else {
                 LazyVGrid(columns: viewModel.gridColumns, spacing: 2) {
-                    ForEach(viewModel.originals) { original in
+                    ForEach(Array(viewModel.originals.enumerated()), id: \.element.id) { index, original in
                         if (original.thumbnails.isEmpty) {
-                            
+
                         } else {
-                            PhotoGridItem(
-                                imageURL:  ApiService.shared.thumbnailURL(for: original.thumbnails.first!.id) )
-                            .aspectRatio(1, contentMode: .fill)
-                        
+                            NavigationLink(destination: PhotoDetailView(originals: viewModel.originals, initialIndex: index)) {
+                                PhotoGridItem(
+                                    imageURL:  ApiService.shared.thumbnailURL(for: original.thumbnails.first!.id) )
+                                .aspectRatio(1, contentMode: .fill)
+                            }
                         }
                     }
                 }

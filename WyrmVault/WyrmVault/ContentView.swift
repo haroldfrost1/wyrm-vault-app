@@ -9,9 +9,13 @@ import SwiftUI
 
 struct ContentView: View {
     @State var photoGalleryViewModel = PhotoGalleryViewModel()
-    
+
     var body: some View {
-        PhotoGalleryView(viewModel: photoGalleryViewModel)
+        NavigationStack {
+            PhotoGalleryView(viewModel: photoGalleryViewModel)
+                .navigationTitle("Photos")
+                .navigationBarTitleDisplayMode(.large)
+        }
     }
 }
 
