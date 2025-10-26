@@ -8,49 +8,47 @@
 import SwiftUI
 
 struct PhotoGalleryView: View {
-    @StateObject private var viewModel = PhotoGalleryViewModel()
+    @Bindable var viewModel: PhotoGalleryViewModel
     
     var body: some View {
-            ScrollView {
-                if viewModel.isLoading && viewModel.originals.isEmpty {
-                    ProgressView("Loading photos...")
-                        .padding()
-                } else if viewModel.originals.isEmpty {
-                    VStack(spacing: 20) {
-                        Image(systemName: "photo.stack")
-                            .font(.system(size: 60))
-                            .foregroundColor(.gray)
-                        Text("No photos yet")
-                            .font(.title2)
-                            .foregroundColor(.gray)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.top, 100)
-                } else {
-                    LazyVGrid(columns: viewModel.gridColumns, spacing: 2) {
-                        ForEach(viewModel.originals) { original in
-                            PhotoGridItem(original: original)
-                                .aspectRatio(1, contentMode: .fill)
-                                .onAppear {
-                                    // Load more when reaching the last item
-                                    if original.id == viewModel.originals.last?.id {
-                                        Task {
-                                            await viewModel.loadMore()
-                                        }
-                                    }
-                                }
+        ScrollView {
+            if viewModel.isLoading && viewModel.originals.isEmpty {
+                ProgressView("Loading photos...")
+                    .padding()
+            } else if viewModel.originals.isEmpty {
+                VStack(spacing: 20) {
+                    Image(systemName: "photo.stack")
+                        .font(.system(size: 60))
+                        .foregroundColor(.gray)
+                    Text("No photos yet")
+                        .font(.title2)
+                        .foregroundColor(.gray)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, 100)
+            } else {
+                LazyVGrid(columns: viewModel.gridColumns, spacing: 2) {
+                    ForEach(viewModel.originals) { original in
+                        if (original.thumbnails.isEmpty) {
+                            
+                        } else {
+                            PhotoGridItem(
+                                imageURL:  ApiService.shared.thumbnailURL(for: original.thumbnails.first!.id) )
+                            .aspectRatio(1, contentMode: .fill)
+                        
                         }
                     }
-                    
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .padding()
-                    }
+                }
+                
+                if viewModel.isLoading {
+                    ProgressView()
+                        .padding()
                 }
             }
-            .refreshable {
-                await viewModel.refresh()
-            }
+        }
+        .refreshable {
+            await viewModel.refresh()
+        }
         .task {
             await viewModel.loadInitial()
         }
@@ -59,68 +57,38 @@ struct PhotoGalleryView: View {
 
 // MARK: - Grid Item
 struct PhotoGridItem: View {
-    let original: Original
-    @State private var image: UIImage?
-    @State private var isLoading = true
+    var imageURL: URL?
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                if let image = image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .clipped()
-                } else if isLoading {
-                    Color.gray.opacity(0.2)
-                    ProgressView()
-                } else {
-                    Color.gray.opacity(0.2)
-                    Image(systemName: "photo")
-                        .foregroundColor(.gray)
+                AsyncImage(url: imageURL) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    case .failure:
+                        Image(systemName: "photo")
+                            .foregroundColor(.gray)
+                    @unknown default:
+                        EmptyView()
+                    }
                 }
-            }
-        }
-        .task {
-            await loadImage()
-        }
-    }
-    
-    private func loadImage() async {
-        // Try to load thumbnail first, fall back to original if no thumbnail
-        guard let thumbnailId = original.thumbnails.first?.id,
-              let url = ApiService.shared.thumbnailURL(for: thumbnailId) else {
-            isLoading = false
-            return
-        }
-        
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            if let loadedImage = UIImage(data: data) {
-                await MainActor.run {
-                    self.image = loadedImage
-                    self.isLoading = false
-                }
-            } else {
-                await MainActor.run {
-                    self.isLoading = false
-                }
-            }
-        } catch {
-            await MainActor.run {
-                self.isLoading = false
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .clipped()
             }
         }
     }
 }
 
 // MARK: - View Model
-@MainActor
-class PhotoGalleryViewModel: ObservableObject {
-    @Published var originals: [Original] = []
-    @Published var isLoading = false
-    @Published var gridColumns: [GridItem] = []
+@Observable class PhotoGalleryViewModel {
+    var originals: [Original] = []
+    var isLoading = false
+    var gridColumns: [GridItem] = []
     
     private var currentPage = 1
     private var totalPages = 1
@@ -131,10 +99,11 @@ class PhotoGalleryViewModel: ObservableObject {
     }
     
     private func updateGridColumns() {
-        // For macOS, use window size to determine column count
-        // Default to 6 columns, will adjust based on window width if needed
-        let columnCount = 6
-        gridColumns = Array(repeating: GridItem(.flexible(), spacing: 2), count: columnCount)
+        // Use an adaptive grid so the number of columns adjusts with available width.
+        // Cells will be at least 120pt wide and at most 220pt, maintaining 2pt spacing.
+        gridColumns = [
+            GridItem(.adaptive(minimum: 88, maximum: 120), spacing: 2)
+        ]
     }
     
     func loadInitial() async {
@@ -177,6 +146,6 @@ class PhotoGalleryViewModel: ObservableObject {
 }
 
 #Preview {
-    PhotoGalleryView()
+    PhotoGalleryView(viewModel: PhotoGalleryViewModel())
 }
 

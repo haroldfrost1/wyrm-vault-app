@@ -8,8 +8,10 @@
 import SwiftUI
 
 struct ContentView: View {
+    @State var photoGalleryViewModel = PhotoGalleryViewModel()
+    
     var body: some View {
-        PhotoGalleryView()
+        PhotoGalleryView(viewModel: photoGalleryViewModel)
     }
 }
 
