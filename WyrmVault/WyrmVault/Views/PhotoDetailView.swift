@@ -8,13 +8,14 @@
 import SwiftUI
 
 struct PhotoDetailView: View {
-    let originals: [Original]
+    @Bindable var viewModel: PhotoGalleryViewModel
     let initialIndex: Int
-
     @State private var currentIndex: Int
+    
+    private let loadThreshold: Int = 5 // Load more when within 5 items of the edge
 
-    init(originals: [Original], initialIndex: Int) {
-        self.originals = originals
+    init(viewModel: PhotoGalleryViewModel, initialIndex: Int) {
+        self.viewModel = viewModel
         self.initialIndex = initialIndex
         self._currentIndex = State(initialValue: initialIndex)
     }
@@ -25,14 +26,33 @@ struct PhotoDetailView: View {
                 .ignoresSafeArea()
 
             TabView(selection: $currentIndex) {
-                ForEach(Array(originals.enumerated()), id: \.element.id) { index, original in
+                ForEach(Array(viewModel.originals.enumerated()), id: \.element.id) { index, original in
                     PhotoDetailItem(original: original)
                         .tag(index)
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
+            .onChange(of: currentIndex) { _, newIndex in
+                viewModel.checkAndLoadMoreIfNeeded(currentIndex: newIndex, threshold: loadThreshold)
+            }
+            
+            // Loading indicator for infinite scroll
+            if viewModel.isLoading && viewModel.originals.count > 0 {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .tint(.white)
+                            .padding()
+                            .background(Color.black.opacity(0.7))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        Spacer()
+                    }
+                    .padding(.bottom, 50)
+                }
+            }
         }
-        .navigationTitle("\(currentIndex + 1) of \(originals.count)")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.black, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
@@ -117,25 +137,29 @@ struct PhotoDetailItem: View {
 }
 
 #Preview {
-    NavigationStack {
+    let viewModel = PhotoGalleryViewModel()
+    // Add some sample data to the view model for preview
+    viewModel.originals = [
+        Original(
+            id: "preview-id",
+            uploadEventId: 1,
+            originalName: "sample-photo.jpg",
+            sha256Hash: "abc123",
+            mimeType: "image/jpeg",
+            size: 2048000,
+            fileClassification: "image",
+            fileMetadata: nil,
+            dateTaken: "2025-10-26T12:00:00Z",
+            thumbnails: [],
+            collections: [],
+            createdAt: "2025-10-26T12:00:00Z",
+            updatedAt: "2025-10-26T12:00:00Z"
+        )
+    ]
+    
+    return NavigationStack {
         PhotoDetailView(
-            originals: [
-                Original(
-                    id: "preview-id",
-                    uploadEventId: 1,
-                    originalName: "sample-photo.jpg",
-                    sha256Hash: "abc123",
-                    mimeType: "image/jpeg",
-                    size: 2048000,
-                    fileClassification: "image",
-                    fileMetadata: nil,
-                    dateTaken: "2025-10-26T12:00:00Z",
-                    thumbnails: [],
-                    collections: [],
-                    createdAt: "2025-10-26T12:00:00Z",
-                    updatedAt: "2025-10-26T12:00:00Z"
-                )
-            ],
+            viewModel: viewModel,
             initialIndex: 0
         )
     }

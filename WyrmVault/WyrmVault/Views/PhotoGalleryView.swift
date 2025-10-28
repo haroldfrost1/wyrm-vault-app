@@ -32,19 +32,36 @@ struct PhotoGalleryView: View {
                         if (original.thumbnails.isEmpty) {
 
                         } else {
-                            NavigationLink(destination: PhotoDetailView(originals: viewModel.originals, initialIndex: index)) {
+                            NavigationLink(destination: PhotoDetailView(viewModel: viewModel, initialIndex: index)) {
                                 PhotoGridItem(
                                     imageURL:  ApiService.shared.thumbnailURL(for: original.thumbnails.first!.id) )
                                 .aspectRatio(1, contentMode: .fill)
+                            }
+                            .onAppear {
+                                // Trigger loading more when approaching the end
+                                viewModel.checkAndLoadMoreIfNeeded(currentIndex: index, threshold: 10)
                             }
                         }
                     }
                 }
                 
-                if viewModel.isLoading {
-                    ProgressView()
-                        .padding()
+                // Loading or end-of-content indicator
+                VStack(spacing: 12) {
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .tint(.blue)
+                        Text("Loading more photos...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else if !viewModel.hasMorePages && !viewModel.originals.isEmpty {
+                        VStack(spacing: 8) {
+                            Text("All photos loaded")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
+                .padding(.vertical, 20)
             }
         }
         .refreshable {
@@ -95,6 +112,19 @@ struct PhotoGridItem: View {
     private var totalPages = 1
     private var pageSize = 50
     
+    // Computed properties for PhotoDetailView
+    var hasMorePages: Bool {
+        currentPage < totalPages
+    }
+    
+    var currentPageNumber: Int {
+        currentPage
+    }
+    
+    var totalPagesCount: Int {
+        totalPages
+    }
+    
     init() {
         updateGridColumns()
     }
@@ -125,6 +155,10 @@ struct PhotoGridItem: View {
     }
     
     func loadMore() async {
+        await loadNextPage()
+    }
+    
+    func loadNextPage() async {
         guard !isLoading, currentPage < totalPages else { return }
         
         isLoading = true
@@ -133,12 +167,25 @@ struct PhotoGridItem: View {
         do {
             let response = try await ApiService.shared.fetchOriginals(page: currentPage, pageSize: pageSize)
             originals.append(contentsOf: response.items)
+            totalPages = response.totalPages
         } catch {
             print("Failed to load more originals: \(error)")
             currentPage -= 1 // Revert page increment on error
         }
         
         isLoading = false
+    }
+    
+    func checkAndLoadMoreIfNeeded(currentIndex: Int, threshold: Int = 5) {
+        let shouldLoadMore = (currentIndex >= originals.count - threshold) && 
+                           hasMorePages && 
+                           !isLoading
+        
+        if shouldLoadMore {
+            Task {
+                await loadNextPage()
+            }
+        }
     }
     
     func refresh() async {
