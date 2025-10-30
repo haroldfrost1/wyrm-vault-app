@@ -9,7 +9,7 @@ import SwiftUI
 
 struct PhotoGalleryView: View {
     @Bindable var viewModel: PhotoGalleryViewModel
-    
+
     var body: some View {
         ScrollView {
             if viewModel.isLoading && viewModel.originals.isEmpty {
@@ -44,7 +44,7 @@ struct PhotoGalleryView: View {
                         }
                     }
                 }
-                
+
                 // Loading or end-of-content indicator
                 VStack(spacing: 12) {
                     if viewModel.isLoading {
@@ -103,11 +103,11 @@ struct PhotoGridItem: View {
 }
 
 // MARK: - View Model
-@Observable class PhotoGalleryViewModel {
+@Observable @MainActor class PhotoGalleryViewModel {
     var originals: [Original] = []
     var isLoading = false
     var gridColumns: [GridItem] = []
-    
+
     private var currentPage = 1
     private var totalPages = 1
     private var pageSize = 50
@@ -160,19 +160,19 @@ struct PhotoGridItem: View {
     
     func loadNextPage() async {
         guard !isLoading, currentPage < totalPages else { return }
-        
+
         isLoading = true
-        currentPage += 1
-        
+        let nextPage = currentPage + 1
+
         do {
-            let response = try await ApiService.shared.fetchOriginals(page: currentPage, pageSize: pageSize)
+            let response = try await ApiService.shared.fetchOriginals(page: nextPage, pageSize: pageSize)
             originals.append(contentsOf: response.items)
             totalPages = response.totalPages
+            currentPage = nextPage
         } catch {
             print("Failed to load more originals: \(error)")
-            currentPage -= 1 // Revert page increment on error
         }
-        
+
         isLoading = false
     }
     

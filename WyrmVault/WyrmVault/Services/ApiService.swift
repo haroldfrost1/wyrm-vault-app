@@ -11,8 +11,8 @@ class ApiService {
     static let shared = ApiService()
     
     // Configure these to match your API endpoints
-    private let apiBaseURL = "http://localhost:8000"
-    private let fileServerBaseURL = "http://localhost:8001"
+    private let apiBaseURL = "http://hestia:50004"
+    private let fileServerBaseURL = "http://hestia:50001"
     
     private init() {}
     
