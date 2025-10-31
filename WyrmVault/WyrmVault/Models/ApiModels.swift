@@ -30,6 +30,14 @@ struct PaginatedResponse<T: Codable>: Codable {
     }
 }
 
+// MARK: - FileClassification
+enum FileClassification: String, Codable, CaseIterable {
+    case unclassified = "UNCLASSIFIED"
+    case image = "image"
+    case video = "video"
+    case audio = "audio"
+}
+
 // MARK: - Original
 struct Original: Codable, Identifiable {
     let id: String
@@ -38,7 +46,7 @@ struct Original: Codable, Identifiable {
     let sha256Hash: String?
     let mimeType: String?
     let size: Int?
-    let fileClassification: String?
+    let fileClassification: FileClassification?
     let fileMetadata: [String: AnyCodable]?
     let dateTaken: String?
     let thumbnails: [Thumbnail]

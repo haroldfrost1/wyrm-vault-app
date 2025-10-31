@@ -107,6 +107,7 @@ struct PhotoGridItem: View {
     var originals: [Original] = []
     var isLoading = false
     var gridColumns: [GridItem] = []
+    var shouldAutoLoad = true // Controls whether to automatically load more photos
 
     private var currentPage = 1
     private var totalPages = 1
@@ -177,7 +178,8 @@ struct PhotoGridItem: View {
     }
     
     func checkAndLoadMoreIfNeeded(currentIndex: Int, threshold: Int = 5) {
-        let shouldLoadMore = (currentIndex >= originals.count - threshold) && 
+        let shouldLoadMore = shouldAutoLoad &&
+                           (currentIndex >= originals.count - threshold) && 
                            hasMorePages && 
                            !isLoading
         
